@@ -4,6 +4,7 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.Writer;
+import java.lang.management.ManagementFactory;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -167,6 +168,8 @@ public class StoryManager {
         }
         boolean allDone = false;
         boolean started = false;
+        String inputArgs = ManagementFactory.getRuntimeMXBean().getInputArguments().toString();
+        boolean isDebugOn = inputArgs.contains("-agentlib:jdwp") || inputArgs.contains("-Xrunjdwp");        
         while (!allDone || !started) {
             allDone = true;
             for (RunningStory runningStory : runningStories.values()) {
@@ -176,17 +179,19 @@ public class StoryManager {
 					Future<ThrowableStory> future = runningStory.getFuture();
 					if (!future.isDone()) {
 						allDone = false;
-						StoryDuration duration = runningStory.getDuration();
-						runningStory.updateDuration();
-						if (duration.timedOut()) {
-							embedderMonitor.storyTimeout(story, duration);
-							context.cancelStory(story, duration);
-							future.cancel(true);
-							if (embedderControls.failOnStoryTimeout()) {
-								throw new StoryExecutionFailed(story.getPath(),
-										new StoryTimedOut(duration));
+						if(!isDebugOn) {
+							StoryDuration duration = runningStory.getDuration();
+							runningStory.updateDuration();
+							if (duration.timedOut()) {
+								embedderMonitor.storyTimeout(story, duration);
+								context.cancelStory(story, duration);
+								future.cancel(true);
+								if (embedderControls.failOnStoryTimeout()) {
+									throw new StoryExecutionFailed(story.getPath(),
+											new StoryTimedOut(duration));
+								}
+								continue;
 							}
-							continue;
 						}
 					} else {
 						try {
